@@ -22,7 +22,6 @@ public static class PrefabCreator
     /// <summary>
     /// Test prefab creation with the Sawyer robot.
     /// </summary>
-    [MenuItem("Tests/Sawyer")]
     public static void TestSawyer()
     {
         string path = Path.Combine(Application.dataPath, "robots/sawyer/sawyer.urdf");
@@ -33,7 +32,6 @@ public static class PrefabCreator
     /// <summary>
     /// Test prefab creation with the Baxter robot.
     /// </summary>
-    [MenuItem("Tests/Baxter")]
     public static void TestBaxter()
     {
         string path = Path.Combine(Application.dataPath, "robots/baxter/baxter.urdf");
