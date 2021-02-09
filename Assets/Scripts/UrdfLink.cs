@@ -1,6 +1,5 @@
 using System.Xml;
 using System.Collections.Generic;
-using System.Collections;
 using System.Linq;
 using UnityEngine;
 
@@ -10,6 +9,12 @@ using UnityEngine;
 /// </summary>
 public struct UrdfLink
 {
+    /// <summary>
+    /// The name of the default material.
+    /// </summary>
+    private const string DEFAULT_MATERIAL = "default";
+
+
     /// <summary>
     /// The path to the mesh file.
     /// </summary>
@@ -46,6 +51,10 @@ public struct UrdfLink
     /// The local Euler angles of the joint in Unity coordinates.
     /// </summary>
     public Vector3 rotation;
+    /// <summary>
+    /// The name of the material.
+    /// </summary>
+    public string material;
 
 
     public UrdfLink(XmlNode node)
@@ -62,6 +71,7 @@ public struct UrdfLink
             meshRotation = default;
             position = default;
             rotation = default;
+            material = DEFAULT_MATERIAL;
             return;
         }
         XmlNode origin = inertial.SelectSingleNode("origin");
@@ -76,8 +86,11 @@ public struct UrdfLink
             meshPath = "";
             meshPosition = default;
             meshRotation = default;
+            material = DEFAULT_MATERIAL;
             return;
         }
+
+        material = visual.SelectSingleNode("material").Attributes["name"].Value;
         XmlNode mesh = visual.SelectSingleNode("geometry/mesh");
         // Some nodes don't have meshes.
         hasMesh = mesh != null;

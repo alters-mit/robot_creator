@@ -13,19 +13,60 @@ using TDW.Robotics;
 /// </summary>
 public static class PrefabCreator
 {
+    /// <summary>
+    /// The directory for the prefab.
+    /// </summary>
+    private const string DIR_PREFAB = "Assets/prefabs/";
+
+
+    /// <summary>
+    /// Test prefab creation with the Sawyer robot.
+    /// </summary>
     [MenuItem("Tests/Sawyer")]
-    public static void SawyerTest()
+    public static void TestSawyer()
     {
         string path = Path.Combine(Application.dataPath, "robots/sawyer/sawyer.urdf");
         UrdfToPrefab(path, true);
     }
 
 
+    /// <summary>
+    /// Create a robot prefab from a .urdf file.
+    /// </summary>
+    /// <param name="path">The absolute path to the .urdf file.</param>
+    /// <param name="immovable">If true, this robot is immovable.</param>
     private static void UrdfToPrefab(string path, bool immovable)
     {
         XmlDocument doc = new XmlDocument();
         doc.Load(path);
         XmlNode root = doc.SelectSingleNode("robot");
+        string robotName = root.Attributes["name"].Value;
+
+        // Create materials and store their paths.
+        string materialDirectory = "robots/" + robotName + "/materials";
+        string absoluteMaterialDirectory = Path.Combine(Application.dataPath, materialDirectory);
+        if (!Directory.Exists(absoluteMaterialDirectory))
+        {
+            Directory.CreateDirectory(absoluteMaterialDirectory);
+        }
+        Dictionary<string, string> materials = new Dictionary<string, string>();
+        Material defaultMaterial = GetDefaultMaterial();
+        string defaultMaterialPath = "Assets/" + materialDirectory + "/default.mat";
+        AssetDatabase.CreateAsset(defaultMaterial, defaultMaterialPath);
+        materials.Add("default", defaultMaterialPath);
+        XmlNodeList materialNodes = root.SelectNodes("material");
+        for (int i = 0; i < materialNodes.Count; i++)
+        {
+            float[] rgba = materialNodes[i].SelectSingleNode("color").Attributes["rgba"].
+                Value.Split(' ').Select(q => float.Parse(q)).ToArray();
+            Material material = GetDefaultMaterial();
+            material.color = new Color(rgba[0], rgba[1], rgba[2], rgba[3]);
+            string materialName = materialNodes[i].Attributes["name"].Value;
+            string materialPath = "Assets/" + materialDirectory + "/" + materialName + ".mat";
+            AssetDatabase.CreateAsset(material, materialPath);
+            materials.Add(materialName, materialPath);
+        }
+
         XmlNodeList linkNodes = root.SelectNodes("link");
         // Get all of the links. Key = the name of the link.
         Dictionary<string, UrdfLink> links = new Dictionary<string, UrdfLink>();
@@ -52,7 +93,6 @@ public static class PrefabCreator
         string rootName = links.Keys.Where(li => !children.Contains(li)).First();
         // Create objects from each node.
         nodes.Enqueue(rootName);
-        string robotName = root.Attributes["name"].Value;
         while (nodes.Count > 0)
         {
             GameObject go = new GameObject();
@@ -88,7 +128,6 @@ public static class PrefabCreator
                     colliders.transform.parent = go.transform;
                     colliders.transform.localPosition = link.meshPosition;
 
-     
                     if (prefabEulerAngles.Equals(Vector3.zero))
                     {
                         colliders.transform.localEulerAngles = mesh.transform.localEulerAngles;
@@ -153,6 +192,12 @@ public static class PrefabCreator
                     {
                         a.immovable = immovable;
                     }
+
+                    // Set the materials.
+                    foreach (MeshRenderer mr in mesh.GetComponentsInChildren<MeshRenderer>())
+                    {
+                        mr.sharedMaterial = AssetDatabase.LoadAssetAtPath<Material>(materials[link.material]);
+                    }
                 }
             }
             // Get the children.
@@ -168,5 +213,33 @@ public static class PrefabCreator
                 }
             }
         }
+
+        // Rename the robot.
+        GameObject robot = GameObject.Find(rootName);
+        robot.name = robotName;
+
+        // Create the prefab directory if it doesn't exist.
+        string absolutePrefabPath = Path.Combine(Application.dataPath, "prefabs");
+        if (!Directory.Exists(absolutePrefabPath))
+        {
+            Directory.CreateDirectory(absolutePrefabPath);
+        }
+
+        // Create the prefab.
+        PrefabUtility.SaveAsPrefabAsset(robot, DIR_PREFAB + robot.name + ".prefab");
+        Object.DestroyImmediate(robot);
+    }
+
+
+    /// <summary>
+    /// Returns the default material for this robot.
+    /// </summary>
+    private static Material GetDefaultMaterial()
+    {
+        Material material = new Material(Shader.Find("Standard"));
+        material.SetFloat("_Metallic", 0.75f);
+        material.SetFloat("_Glossiness", 0.75f);
+        material.color = new Color(0.33f, 0.33f, 0.33f, 0.0f);
+        return material;
     }
 }

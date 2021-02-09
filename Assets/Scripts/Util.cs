@@ -43,20 +43,17 @@ public static class Util
     }
 
 
-    public static void SetParentAndAlign(this Transform transform, Transform parent, bool keepLocalTransform = true)
+    /// <summary>
+    /// Transform and align a child to a parent object.
+    /// </summary>
+    /// <param name="transform">(this)</param>
+    /// <param name="parent">The parent object.</param>
+    public static void SetParentAndAlign(this Transform transform, Transform parent)
     {
         Vector3 localPosition = transform.localPosition;
         Quaternion localRotation = transform.localRotation;
         transform.parent = parent;
-        if (keepLocalTransform)
-        {
-            transform.position = transform.parent.position + localPosition;
-            transform.rotation = transform.parent.rotation * localRotation;
-        }
-        else
-        {
-            transform.localPosition = Vector3.zero;
-            transform.localRotation = Quaternion.identity;
-        }
+        transform.position = transform.parent.position + localPosition;
+        transform.rotation = transform.parent.rotation * localRotation;
     }
 }

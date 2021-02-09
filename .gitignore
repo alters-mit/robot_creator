@@ -31,8 +31,8 @@ ExportedObj/
 bin/
 Assets/robots/
 Assets/robots.meta
-Assets/prefabs/*.prefab
-Assets/prefabs/*.prefab.meta
+Assets/prefabs/
+Assets/prefabs.meta
 Assets/dest/
 Assets/dest.meta
 Assets/prefabs/*.prefab
@@ -41,3 +41,4 @@ Assets/Meshes/
 Assets/Meshes.meta
 Logs/AssetImportWorker0*
 .vsconfig
+Logs/ApiUpdaterCheck.txt
