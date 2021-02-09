@@ -27,8 +27,8 @@ public static class Util
         float[] coordinates = rpy.Split(' ').Select(q => float.Parse(q)).ToArray();
         return new Vector3(
             coordinates[1] * Mathf.Rad2Deg,
-            coordinates[0] * Mathf.Rad2Deg,
-            coordinates[2] * Mathf.Rad2Deg);
+            -coordinates[2] * Mathf.Rad2Deg,
+            -coordinates[0] * Mathf.Rad2Deg);
     }
 
 
@@ -40,5 +40,23 @@ public static class Util
     {
         float[] a = axis.Split(' ').Select(q => float.Parse(q)).ToArray();
         return new Vector3(a[0], a[1], a[2]);
+    }
+
+
+    public static void SetParentAndAlign(this Transform transform, Transform parent, bool keepLocalTransform = true)
+    {
+        Vector3 localPosition = transform.localPosition;
+        Quaternion localRotation = transform.localRotation;
+        transform.parent = parent;
+        if (keepLocalTransform)
+        {
+            transform.position = transform.parent.position + localPosition;
+            transform.rotation = transform.parent.rotation * localRotation;
+        }
+        else
+        {
+            transform.localPosition = Vector3.zero;
+            transform.localRotation = Quaternion.identity;
+        }
     }
 }

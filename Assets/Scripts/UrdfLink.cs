@@ -1,6 +1,7 @@
 using System.Xml;
 using System.Collections.Generic;
 using System.Collections;
+using System.Linq;
 using UnityEngine;
 
 
@@ -37,6 +38,14 @@ public struct UrdfLink
     /// If true, this is a camera link.
     /// </summary>
     public bool camera;
+    /// <summary>
+    /// The local position of the joint in Unity coordinates.
+    /// </summary>
+    public Vector3 position;
+    /// <summary>
+    /// The local Euler angles of the joint in Unity coordinates.
+    /// </summary>
+    public Vector3 rotation;
 
 
     public UrdfLink(XmlNode node)
@@ -51,8 +60,13 @@ public struct UrdfLink
             meshPath = "";
             meshPosition = default;
             meshRotation = default;
+            position = default;
+            rotation = default;
             return;
         }
+        XmlNode origin = inertial.SelectSingleNode("origin");
+        position = origin.Attributes["xyz"].Value.xyzToVector3();
+        rotation = origin.Attributes["rpy"].Value.rpyToVector3();
         camera = false;
         mass = float.Parse(inertial.SelectSingleNode("mass").Attributes["value"].Value);
         XmlNode visual = node.SelectSingleNode("visual");
@@ -72,8 +86,11 @@ public struct UrdfLink
             meshPath = mesh.Attributes["filename"].Value;
             // Get the position of the mesh.
             XmlNode meshOrigin = visual.SelectSingleNode("origin");
-            meshPosition = meshOrigin.Attributes["xyz"].Value.xyzToVector3();
-            meshRotation = meshOrigin.Attributes["rpy"].Value.rpyToVector3();
+
+            float[] xyz = meshOrigin.Attributes["xyz"].Value.Split(' ').Select(q => float.Parse(q)).ToArray();
+            meshPosition = new Vector3(-xyz[1], xyz[2], xyz[0]);
+            float[] rpy = meshOrigin.Attributes["rpy"].Value.Split(' ').Select(q => float.Parse(q)).ToArray();
+            meshRotation = new Vector3(rpy[0] * Mathf.Rad2Deg, rpy[1] * Mathf.Rad2Deg, rpy[2] * Mathf.Rad2Deg);
         }
         else
         {

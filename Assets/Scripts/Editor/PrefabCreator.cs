@@ -62,28 +62,42 @@ public static class PrefabCreator
             if (joints.ContainsKey(link))
             {
                 UrdfJoint joint = joints[link];
+
+                //go.transform.SetParentAndAlign(GameObject.Find(joint.parent).transform);
                 go.transform.parent = GameObject.Find(joint.parent).transform;
                 go.transform.localPosition = joint.position;
                 go.transform.localEulerAngles = joint.rotation;
+
                 if (link.hasMesh)
                 {
                     // Get the mesh.
                     string p = Path.Combine("Assets/robots/", robotName, link.meshPath);
                     p = Regex.Replace(p, "package://", "");
 
+                    Vector3 prefabEulerAngles = AssetDatabase.LoadAssetAtPath<GameObject>(p).transform.eulerAngles;
                     GameObject mesh = Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(p));
-                    mesh.transform.parent = go.transform;
+
+                    mesh.transform.SetParentAndAlign(go.transform);
                     mesh.transform.localPosition = link.meshPosition;
-                    mesh.transform.localEulerAngles = link.meshRotation;
+                    mesh.transform.localEulerAngles = new Vector3(-90, 0, 90) - link.meshRotation;
                     mesh.name = "visual";
 
                     // Get the colliders.
                     string collidersPath = p.Substring(0, p.Length - 4) + ".obj";
-
                     GameObject colliders = Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(collidersPath));
                     colliders.transform.parent = go.transform;
                     colliders.transform.localPosition = link.meshPosition;
-                    colliders.transform.localEulerAngles = link.meshRotation;
+
+     
+                    if (prefabEulerAngles.Equals(Vector3.zero))
+                    {
+                        colliders.transform.localEulerAngles = mesh.transform.localEulerAngles;
+                    }
+                    else
+                    {
+                        colliders.transform.localEulerAngles = new Vector3(0, 90, 0);
+                    }
+
                     colliders.name = "colliders";
                     foreach (MeshFilter mf in colliders.GetComponentsInChildren<MeshFilter>())
                     {
