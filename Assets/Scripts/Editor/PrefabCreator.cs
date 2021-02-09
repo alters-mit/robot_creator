@@ -31,6 +31,17 @@ public static class PrefabCreator
 
 
     /// <summary>
+    /// Test prefab creation with the Baxter robot.
+    /// </summary>
+    [MenuItem("Tests/Baxter")]
+    public static void TestBaxter()
+    {
+        string path = Path.Combine(Application.dataPath, "robots/baxter/baxter.urdf");
+        UrdfToPrefab(path, true);
+    }
+
+
+    /// <summary>
     /// Create a robot prefab from a .urdf file.
     /// </summary>
     /// <param name="path">The absolute path to the .urdf file.</param>
@@ -196,7 +207,16 @@ public static class PrefabCreator
                     // Set the materials.
                     foreach (MeshRenderer mr in mesh.GetComponentsInChildren<MeshRenderer>())
                     {
-                        mr.sharedMaterial = AssetDatabase.LoadAssetAtPath<Material>(materials[link.material]);
+                        string m;
+                        if (!materials.ContainsKey(link.material))
+                        {
+                            m = "default";
+                        }
+                        else
+                        {
+                            m = link.material;
+                        }
+                        mr.sharedMaterial = AssetDatabase.LoadAssetAtPath<Material>(materials[m]);
                     }
                 }
             }
@@ -224,6 +244,17 @@ public static class PrefabCreator
         {
             Directory.CreateDirectory(absolutePrefabPath);
         }
+
+        // Remove garbage objects.
+        foreach (Light light in robot.GetComponentsInChildren<Light>())
+        {
+            Object.DestroyImmediate(light.gameObject);
+        }
+        foreach (Camera camera in robot.GetComponentsInChildren<Camera>())
+        {
+            Object.DestroyImmediate(camera.gameObject);
+        }
+
 
         // Create the prefab.
         PrefabUtility.SaveAsPrefabAsset(robot, DIR_PREFAB + robot.name + ".prefab");

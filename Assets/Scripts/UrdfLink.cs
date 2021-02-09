@@ -90,7 +90,15 @@ public struct UrdfLink
             return;
         }
 
-        material = visual.SelectSingleNode("material").Attributes["name"].Value;
+        XmlNode materialNode = visual.SelectSingleNode("material");
+        if (materialNode == null)
+        {
+            material = DEFAULT_MATERIAL;
+        }
+        else
+        {
+            material = materialNode.Attributes["name"].Value;
+        }
         XmlNode mesh = visual.SelectSingleNode("geometry/mesh");
         // Some nodes don't have meshes.
         hasMesh = mesh != null;
