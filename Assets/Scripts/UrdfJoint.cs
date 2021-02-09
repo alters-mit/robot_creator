@@ -86,23 +86,30 @@ public struct UrdfJoint
         if (t == "continuous" || t == "revolute" || t == "prismatic")
         {
             axes = new DriveAxis[1];
-            Vector3 axis = node.SelectSingleNode("axis").Attributes["xyz"].Value.axisToVector3();
-            // Get the drive axis for a single-axis rotation.
-            if (axis.x != 0)
+            if (t == "continuous" || t == "revolute")
             {
                 axes[0] = DriveAxis.x;
             }
-            else if (axis.y != 0)
-            {
-                axes[0] = DriveAxis.y;
-            }
-            else if (axis.z != 0)
-            {
-                axes[0] = DriveAxis.z;
-            }
             else
             {
-                throw new System.Exception("No axis for: " + name);
+                Vector3 axis = node.SelectSingleNode("axis").Attributes["xyz"].Value.axisToVector3();
+                // Get the drive axis for a single-axis rotation.
+                if (axis.x != 0)
+                {
+                    axes[0] = DriveAxis.x;
+                }
+                else if (axis.y != 0)
+                {
+                    axes[0] = DriveAxis.y;
+                }
+                else if (axis.z != 0)
+                {
+                    axes[0] = DriveAxis.z;
+                }
+                else
+                {
+                    throw new System.Exception("No axis for: " + name);
+                }
             }
 
             // Continuous joints don't have limits.,
