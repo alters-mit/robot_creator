@@ -1,5 +1,8 @@
 using System;
 using System.IO;
+using System.Collections.Generic;
+using System.Xml;
+using System.Linq;
 using System.Text.RegularExpressions;
 using UnityEngine;
 using UnityEditor;
@@ -8,6 +11,7 @@ using RosSharp.Urdf.Editor;
 using RosSharp;
 using RosSharp.Urdf;
 using RosSharp.Control;
+using TDW.Robotics;
 
 
 /// <summary>
@@ -21,6 +25,20 @@ public static class Creator
     private const string DIR_PREFAB = "Assets/prefabs/";
 
 
+    [MenuItem("Tests/Sawyer")]
+    public static void Sawyer()
+    {
+        string path = Path.Combine(Application.dataPath, "robots/sawyer.urdf");
+        // Create the prefab.
+        ImportSettings settings = new ImportSettings
+        {
+            choosenAxis = ImportSettings.axisType.yAxis,
+            convexMethod = ImportSettings.convexDecomposer.vHACD
+        };
+        CreatePrefab(path, settings, true);
+    }
+
+
     /// <summary>
     /// Create a prefab from a .urdf file. The .urdf file and its meshes must be already downloaded.
     /// Expected command line arguments:
@@ -28,7 +46,6 @@ public static class Creator
     /// -urdf=path (Path to the .urdf file. Required.)
     /// -immovable=true (Whether or not the robot root is immovable. Options: true, false. Default: true)
     /// -up=y (The up axis. Options: y, z. Default: y)
-    /// -convex=vhacd (The convex decomposer. Options: unity, vhacd. Default: vhacd)
     /// </summary>
     public static void CreatePrefab()
     {
@@ -60,28 +77,12 @@ public static class Creator
             Debug.LogWarning("Invalid -up value: " + up + " Using y instead.");
             axis = ImportSettings.axisType.yAxis;
         }
-        // Get the convex decomposer.
-        string c = GetStringValue(args, "convex", defaultValue: "vhacd");
-        ImportSettings.convexDecomposer convex;
-        if (c == "unity")
-        {
-            convex = ImportSettings.convexDecomposer.unity;
-        }
-        else if (c == "vhacd")
-        {
-            convex = ImportSettings.convexDecomposer.vHACD;
-        }
-        else
-        {
-            Debug.LogWarning("Invalid -convex value: " + c + " Using vhacd instead.");
-            convex = ImportSettings.convexDecomposer.vHACD;
-        }
 
         // Create the prefab.
         ImportSettings settings = new ImportSettings
         {
             choosenAxis = axis,
-            convexMethod = convex
+            convexMethod = ImportSettings.convexDecomposer.vHACD
         };
         CreatePrefab(urdfPath, settings, immovable);
     }
@@ -150,17 +151,65 @@ public static class Creator
         // Import the robot.
         UrdfRobotExtensions.Create(urdfPath, settings);
 
-        // Remove ROS garbage.
+        // Remove irrelevant ROS components.
         GameObject robot = Object.FindObjectOfType<UrdfRobot>().gameObject;
-        DestroyAll<RosSharp.Urdf.UrdfJoint> (robot);
-        DestroyAll<UrdfInertial>(robot);
-        DestroyAll<UrdfVisuals>(robot);
-        DestroyAll<UrdfVisual>(robot);
-        DestroyAll<UrdfCollisions>(robot);
-        DestroyAll<UrdfCollision>(robot);
-        DestroyAll<RosSharp.Urdf.UrdfLink>(robot);
-        DestroyAll<UrdfRobot>(robot);
-        DestroyAll<Controller>(robot);
+        robot.DestroyAll<RosSharp.Urdf.UrdfJoint>();
+        robot.DestroyAll<UrdfInertial>();
+        robot.DestroyAll<UrdfVisuals>();
+        robot.DestroyAll<UrdfVisual>();
+        robot.DestroyAll<UrdfCollisions>();
+        robot.DestroyAll<UrdfCollision>();
+        robot.DestroyAll<RosSharp.Urdf.UrdfLink>();
+        robot.DestroyAll<UrdfRobot>();
+        robot.DestroyAll<Controller>();
+        // Destroy the generated colliders.
+        robot.DestroyAllObjects("Collisions");
+        // Destroy unwanted objects.
+        robot.DestroyAllComponents<Light>();
+        robot.DestroyAllComponents<Camera>();
+        robot.DestroyAllComponents<UrdfPlugins>();
+
+        // Load the .urdf file.
+        XmlDocument doc = new XmlDocument();
+        doc.Load(urdfPath);
+        XmlNode xmlRoot = doc.SelectSingleNode("robot");
+
+        // Get the prismatic joints.
+        XmlNodeList jointNodes = xmlRoot.SelectNodes("joint");
+        // The name of each prismatic joint and its axis.
+        Dictionary<string, DriveAxis> prismaticAxes = new Dictionary<string, DriveAxis>();
+        for (int i = 0; i < jointNodes.Count; i++)
+        {
+            string jointType = jointNodes[i].Attributes["type"].Value.ToLower();
+            if (jointType == "prismatic")
+            {
+                string jointChild = jointNodes[i].SelectSingleNode("child").Attributes["link"].Value;
+                if (prismaticAxes.ContainsKey(jointChild))
+                {
+                    continue;
+                }
+                Vector3 xyz = jointNodes[i].SelectSingleNode("axis").Attributes["xyz"].Value.xyzToVector3();
+                DriveAxis driveAxis;
+                // Get the drive axis for a single-axis rotation.
+                if (xyz.x != 0)
+                {
+                    driveAxis = DriveAxis.x;
+                }
+                else if (xyz.y != 0)
+                {
+                    driveAxis = DriveAxis.y;
+                }
+                else if (xyz.z != 0)
+                {
+                    driveAxis = DriveAxis.z;
+                }
+                else
+                {
+                    throw new System.Exception("No axis for: " + jointChild);
+                }
+                prismaticAxes.Add(jointChild, driveAxis);
+            }
+        }
 
         // Fix the articulation drives.;
         foreach (ArticulationBody a in robot.GetComponentsInChildren<ArticulationBody>())
@@ -172,6 +221,52 @@ public static class Creator
                 drive.damping = 180;
                 a.xDrive = drive;
             }
+            // Set the prismatic joint's drive values and expected axis.
+            else if (a.jointType == ArticulationJointType.PrismaticJoint)
+            {
+                DriveAxis da = prismaticAxes[a.name];
+                ArticulationDrive drive;
+                if (da == DriveAxis.x)
+                {
+                    drive = a.xDrive;
+                }
+                else if (da == DriveAxis.y)
+                {
+                    drive = a.yDrive;
+                }
+                else
+                {
+                    drive = a.zDrive;
+                }
+                drive.forceLimit = a.xDrive.forceLimit;
+                drive.stiffness = 1000;
+                drive.damping = 180;
+                drive.lowerLimit = a.xDrive.lowerLimit;
+                drive.upperLimit = a.xDrive.upperLimit;
+                if (da == DriveAxis.x)
+                {
+                    a.linearLockX = ArticulationDofLock.LimitedMotion;
+                    a.linearLockY = ArticulationDofLock.LockedMotion;
+                    a.linearLockZ = ArticulationDofLock.LockedMotion;
+                    a.xDrive = drive;
+                }
+                else if (da == DriveAxis.y)
+                {
+                    a.linearLockX = ArticulationDofLock.LockedMotion;
+                    a.linearLockY = ArticulationDofLock.LimitedMotion;
+                    a.linearLockZ = ArticulationDofLock.LockedMotion;
+                    a.yDrive = drive;
+                }
+                else
+                {
+                    a.linearLockX = ArticulationDofLock.LockedMotion;
+                    a.linearLockY = ArticulationDofLock.LockedMotion;
+                    a.linearLockZ = ArticulationDofLock.LimitedMotion;
+                    a.zDrive = drive;
+                }
+                ExpectedDriveAxis eda = a.gameObject.AddComponent<ExpectedDriveAxis>();
+                eda.axis = da;
+            }
             a.anchorPosition = Vector3.zero;
             // Set the root articulation body as the root object.
             if (a.isRoot)
@@ -180,18 +275,63 @@ public static class Creator
             }
         }
 
-        // Remove garbage objects.
-        foreach (Light light in robot.GetComponentsInChildren<Light>())
+        // Destroy redundant ArticulationBodies.
+        ArticulationBody[] badBodies = robot.GetComponentsInChildren<ArticulationBody>().
+            Where(a => !a.isRoot && a.mass < 0.01f && a.jointType == ArticulationJointType.FixedJoint && 
+            a.GetComponentsInChildren<MeshFilter>().Length == 0).
+            ToArray();
+        foreach (ArticulationBody b in badBodies)
         {
-            Object.DestroyImmediate(light.gameObject);
+            Object.DestroyImmediate(b.gameObject);
         }
-        foreach (Camera camera in robot.GetComponentsInChildren<Camera>())
+
+        XmlNodeList linkNodes = xmlRoot.SelectNodes("link");
+        HashSet<Transform> checkedChildren = new HashSet<Transform>();
+        for (int i = 0; i < linkNodes.Count; i++)
         {
-            Object.DestroyImmediate(camera.gameObject);
-        }
-        foreach (UrdfPlugins plugins in robot.GetComponentsInChildren<UrdfPlugins>())
-        {
-            Object.DestroyImmediate(plugins.gameObject);
+            XmlNode meshNode = linkNodes[i].SelectSingleNode("visual/geometry/mesh");
+            if (meshNode == null)
+            {
+                continue;
+            }
+            string meshPath = meshNode.Attributes["filename"].Value;
+            // Get the name of the mesh.
+            string meshName = Path.GetFileNameWithoutExtension(meshPath);
+            // Get the corresponding child object.
+            HashSet<Transform> children = robot.transform.FindDeepChildren(meshName);
+            foreach (Transform child in children)
+            {
+                if (checkedChildren.Contains(child))
+                {
+                    continue;
+                }
+                // Get only the visuals.
+                if (child.parent == null || child.parent.name != "unnamed")
+                {
+                    continue;
+                }
+                meshPath = Regex.Replace(meshPath, "package://", "Assets/robots/");
+                string collidersPath = meshPath.Substring(0, meshPath.Length - 4) + ".obj";
+                // Create the colliders object.
+                GameObject colliders = Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(collidersPath));
+                colliders.name = "colliders_" + child.name;
+                colliders.transform.parent = child;
+                // Match the transform of the colliders to the parent object.
+                colliders.transform.localPosition = Vector3.zero;
+                colliders.transform.localScale = Vector3.one;
+                colliders.transform.localEulerAngles = new Vector3(90, 0, 0);
+                colliders.transform.parent = child.parent.parent.parent;
+                // Create colliders from the mesh filters.
+                foreach (MeshFilter colliderMesh in colliders.GetComponentsInChildren<MeshFilter>())
+                {
+                    MeshCollider mc = colliderMesh.gameObject.AddComponent<MeshCollider>();
+                    mc.sharedMesh = colliderMesh.sharedMesh;
+                    mc.convex = true;
+                    Object.DestroyImmediate(colliderMesh.GetComponent<MeshRenderer>());
+                    Object.DestroyImmediate(colliderMesh);
+                }
+                checkedChildren.Add(child);
+            }
         }
 
         // Create the prefab directory if it doesn't exist.
@@ -203,22 +343,5 @@ public static class Creator
 
         // Create the prefab.
         PrefabUtility.SaveAsPrefabAsset(robot, DIR_PREFAB + robot.name + ".prefab");
-        // Destroy the object in the scene.
-       // Object.DestroyImmediate(robot);
-    }
-
-
-    /// <summary>
-    /// Destroy all components of type T on the robot.
-    /// </summary>
-    /// <typeparam name="T">The type of component.</typeparam>
-    /// <param name="go">The robot.</param>
-    private static void DestroyAll<T>(GameObject go)
-        where T: MonoBehaviour
-    {
-        foreach (T t in go.GetComponentsInChildren<T>())
-        {
-            Object.DestroyImmediate(t);
-        }
     }
 }
