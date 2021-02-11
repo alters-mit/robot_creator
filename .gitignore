@@ -42,3 +42,5 @@ Assets/Meshes.meta
 Logs/AssetImportWorker0*
 .vsconfig
 Logs/ApiUpdaterCheck.txt
+temp/
+temp_robots/

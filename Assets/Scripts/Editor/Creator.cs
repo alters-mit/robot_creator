@@ -1,9 +1,13 @@
+using System;
 using System.IO;
+using System.Text.RegularExpressions;
 using UnityEngine;
 using UnityEditor;
+using Object = UnityEngine.Object;
 using RosSharp.Urdf.Editor;
 using RosSharp;
 using RosSharp.Urdf;
+using RosSharp.Control;
 
 
 /// <summary>
@@ -12,34 +16,126 @@ using RosSharp.Urdf;
 public static class Creator
 {
     /// <summary>
-    /// Test prefab creation with the Baxter robot.
+    /// The directory for the prefab.
     /// </summary>
-    [MenuItem("Tests/Baxter")]
-    public static void TestBaxter()
+    private const string DIR_PREFAB = "Assets/prefabs/";
+
+
+    /// <summary>
+    /// Create a prefab from a .urdf file. The .urdf file and its meshes must be already downloaded.
+    /// Expected command line arguments:
+    /// 
+    /// -urdf=path (Path to the .urdf file. Required.)
+    /// -immovable=true (Whether or not the robot root is immovable. Options: true, false. Default: true)
+    /// -up=y (The up axis. Options: y, z. Default: y)
+    /// -convex=vhacd (The convex decomposer. Options: unity, vhacd. Default: vhacd)
+    /// </summary>
+    public static void CreatePrefab()
     {
-        string path = Path.Combine(Application.dataPath, "robots/baxter/baxter.urdf");
+        string[] args = Environment.GetCommandLineArgs();
+        string urdfPath = GetStringValue(args, "urdf");
+        if (urdfPath == null)
+        {
+            Debug.LogError("No -urdf argument provided.");
+        }
+        bool immovable = GetBooleanValue(args, "immovable", defaultValue: true);
+
+        // Get the axis.
+        string up = GetStringValue(args, "up");
+        ImportSettings.axisType axis;
+        if (up == null)
+        {
+            axis = ImportSettings.axisType.yAxis;  
+        }
+        else if (up == "y")
+        {
+            axis = ImportSettings.axisType.yAxis;
+        }
+        else if (up == "z")
+        {
+            axis = ImportSettings.axisType.zAxis;
+        }
+        else
+        {
+            Debug.LogWarning("Invalid -up value: " + up + " Using y instead.");
+            axis = ImportSettings.axisType.yAxis;
+        }
+        // Get the convex decomposer.
+        string c = GetStringValue(args, "convex", defaultValue: "vhacd");
+        ImportSettings.convexDecomposer convex;
+        if (c == "unity")
+        {
+            convex = ImportSettings.convexDecomposer.unity;
+        }
+        else if (c == "vhacd")
+        {
+            convex = ImportSettings.convexDecomposer.vHACD;
+        }
+        else
+        {
+            Debug.LogWarning("Invalid -convex value: " + c + " Using vhacd instead.");
+            convex = ImportSettings.convexDecomposer.vHACD;
+        }
+
+        // Create the prefab.
         ImportSettings settings = new ImportSettings
         {
-            choosenAxis = ImportSettings.axisType.yAxis,
-            convexMethod = ImportSettings.convexDecomposer.vHACD
+            choosenAxis = axis,
+            convexMethod = convex
         };
-        CreatePrefab(path, settings, true);
+        CreatePrefab(urdfPath, settings, immovable);
     }
 
 
     /// <summary>
-    /// Test prefab creation with the Baxter robot.
+    /// Return the string value of an argument, given this format: -flag=value
     /// </summary>
-    [MenuItem("Tests/Sawyer")]
-    public static void TestSawyer()
+    /// <param name="args">All environment args.</param>
+    /// <param name="flag">The flag.</param>
+    /// <param name="defaultValue">The default value.</param>
+    private static string GetStringValue(string[] args, string flag, string defaultValue = null)
     {
-        string path = Path.Combine(Application.dataPath, "robots/sawyer/sawyer.urdf");
-        ImportSettings settings = new ImportSettings
+        if (flag[0] != '-')
         {
-            choosenAxis = ImportSettings.axisType.yAxis,
-            convexMethod = ImportSettings.convexDecomposer.vHACD
-        };
-        CreatePrefab(path, settings, true);
+            flag = "-" + flag;
+        }
+        foreach (string arg in args)
+        {
+            if (arg.StartsWith(flag))
+            {
+                string[] kv = arg.Split('=');
+                return Regex.Replace(kv[1], "'", "");
+            }
+        }
+        return defaultValue;
+    }
+
+
+    /// <summary>
+    /// Return the boolean value of an argument, given this format: -flag=value
+    /// </summary>
+    /// <param name="args">All environment args.</param>
+    /// <param name="flag">The flag.</param>
+    /// <param name="defaultValue">The default value.</param>
+    private static bool GetBooleanValue(string[] args, string flag, bool defaultValue = false)
+    {
+        string v = GetStringValue(args, flag);
+        if (v == null)
+        {
+            return defaultValue;
+        }
+        else if (v.ToLower() == "false")
+        {
+            return false;
+        }
+        else if (v.ToLower() == "true")
+        {
+            return true;
+        }
+        else
+        {
+            return defaultValue;
+        }
     }
 
 
@@ -55,18 +151,19 @@ public static class Creator
         UrdfRobotExtensions.Create(urdfPath, settings);
 
         // Remove ROS garbage.
-        GameObject robotRoot = Object.FindObjectOfType<UrdfRobot>().gameObject;
-        DestroyAll<RosSharp.Urdf.UrdfJoint> (robotRoot);
-        DestroyAll<UrdfInertial>(robotRoot);
-        DestroyAll<UrdfVisuals>(robotRoot);
-        DestroyAll<UrdfVisual>(robotRoot);
-        DestroyAll<UrdfCollisions>(robotRoot);
-        DestroyAll<UrdfCollision>(robotRoot);
-        DestroyAll<RosSharp.Urdf.UrdfLink>(robotRoot);
-        DestroyAll<UrdfRobot>(robotRoot);
+        GameObject robot = Object.FindObjectOfType<UrdfRobot>().gameObject;
+        DestroyAll<RosSharp.Urdf.UrdfJoint> (robot);
+        DestroyAll<UrdfInertial>(robot);
+        DestroyAll<UrdfVisuals>(robot);
+        DestroyAll<UrdfVisual>(robot);
+        DestroyAll<UrdfCollisions>(robot);
+        DestroyAll<UrdfCollision>(robot);
+        DestroyAll<RosSharp.Urdf.UrdfLink>(robot);
+        DestroyAll<UrdfRobot>(robot);
+        DestroyAll<Controller>(robot);
 
-        // Fix the articulation drives.
-        foreach (ArticulationBody a in robotRoot.GetComponentsInChildren<ArticulationBody>())
+        // Fix the articulation drives.;
+        foreach (ArticulationBody a in robot.GetComponentsInChildren<ArticulationBody>())
         {
             if (a.jointType == ArticulationJointType.RevoluteJoint)
             {
@@ -80,11 +177,34 @@ public static class Creator
             if (a.isRoot)
             {
                 a.immovable = immovable;
-                a.name = robotRoot.name;
-                a.transform.parent = null;
             }
         }
-        Object.DestroyImmediate(robotRoot.gameObject);
+
+        // Remove garbage objects.
+        foreach (Light light in robot.GetComponentsInChildren<Light>())
+        {
+            Object.DestroyImmediate(light.gameObject);
+        }
+        foreach (Camera camera in robot.GetComponentsInChildren<Camera>())
+        {
+            Object.DestroyImmediate(camera.gameObject);
+        }
+        foreach (UrdfPlugins plugins in robot.GetComponentsInChildren<UrdfPlugins>())
+        {
+            Object.DestroyImmediate(plugins.gameObject);
+        }
+
+        // Create the prefab directory if it doesn't exist.
+        string absolutePrefabPath = Path.Combine(Application.dataPath, "prefabs");
+        if (!Directory.Exists(absolutePrefabPath))
+        {
+            Directory.CreateDirectory(absolutePrefabPath);
+        }
+
+        // Create the prefab.
+        PrefabUtility.SaveAsPrefabAsset(robot, DIR_PREFAB + robot.name + ".prefab");
+        // Destroy the object in the scene.
+       // Object.DestroyImmediate(robot);
     }
 
 
