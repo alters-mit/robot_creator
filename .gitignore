@@ -44,3 +44,5 @@ Logs/AssetImportWorker0*
 Logs/ApiUpdaterCheck.txt
 temp/
 temp_robots/
+Assets/asset_bundles/
+Assets/asset_bundles.meta

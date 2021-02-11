@@ -19,12 +19,6 @@ using TDW.Robotics;
 /// </summary>
 public static class Creator
 {
-    /// <summary>
-    /// The directory for the prefab.
-    /// </summary>
-    private const string DIR_PREFAB = "Assets/prefabs/";
-
-
     [MenuItem("Tests/Sawyer")]
     public static void Sawyer()
     {
@@ -43,7 +37,7 @@ public static class Creator
     /// Create a prefab from a .urdf file. The .urdf file and its meshes must be already downloaded.
     /// Expected command line arguments:
     /// 
-    /// -urdf=path (Path to the .urdf file. Required.)
+    /// -urdf=string_path (Path to the .urdf file. Required.)
     /// -immovable=true (Whether or not the robot root is immovable. Options: true, false. Default: true)
     /// -up=y (The up axis. Options: y, z. Default: y)
     /// </summary>
@@ -85,6 +79,25 @@ public static class Creator
             convexMethod = ImportSettings.convexDecomposer.vHACD
         };
         CreatePrefab(urdfPath, settings, immovable);
+    }
+
+
+    /// <summary>
+    /// Create asset bundles from an existing prefab.
+    /// Expected command line arguments:
+    /// 
+    /// -robot=string (The name of the robot; must match the name of the prefab. Required.)
+    /// </summary>
+    public static void CreateAssetBundles()
+    {
+        string[] args = Environment.GetCommandLineArgs();
+        string name = GetStringValue(args, "robot");
+        if (name == null)
+        {
+            Debug.LogError("Expected -robot argument but didn't find one.");
+            return;
+        }
+        CreateAssetBundles(name);
     }
 
 
@@ -342,6 +355,53 @@ public static class Creator
         }
 
         // Create the prefab.
-        PrefabUtility.SaveAsPrefabAsset(robot, DIR_PREFAB + robot.name + ".prefab");
+        PrefabUtility.SaveAsPrefabAsset(robot, "Assets/prefabs/" + robot.name + ".prefab");
+    }
+
+
+    /// <summary>
+    /// Create asset bundles from a prefab.
+    /// </summary>
+    /// <param name="name">The name of the prefab.</param>
+    private static void CreateAssetBundles(string name)
+    {
+        if (name.EndsWith(".prefab"))
+        {
+            name = Regex.Replace(name, @"\.prefab", "");
+        }
+
+        BuildTarget[] targets = new BuildTarget[] {
+            BuildTarget.StandaloneWindows64,
+            BuildTarget.StandaloneOSX,
+            BuildTarget.StandaloneLinux64};
+        AssetBundleBuild[] builds = new AssetBundleBuild[]
+        {
+            new AssetBundleBuild
+            {
+                assetBundleName = name,
+                assetNames = new string[] { Path.Combine("Assets/prefabs", name + ".prefab") }
+            }
+        };
+
+        string assetBundlesAbsoluteDirectory = Path.Combine(Application.dataPath, "asset_bundles/" + name);
+        // Create the directory for all asset bundles.
+        if (!Directory.Exists(assetBundlesAbsoluteDirectory))
+        {
+            Directory.CreateDirectory(assetBundlesAbsoluteDirectory);
+        }
+        // Create a new asset bundle for each target.
+        foreach (BuildTarget target in targets)
+        {
+            string targetDirectory = Path.Combine(assetBundlesAbsoluteDirectory, target.ToString());
+            if (!Directory.Exists(targetDirectory))
+            {
+                Directory.CreateDirectory(targetDirectory);
+            }
+            // Build the asset bundles.
+            BuildPipeline.BuildAssetBundles(targetDirectory,
+                builds,
+                BuildAssetBundleOptions.None,
+                target);
+        }
     }
 }
