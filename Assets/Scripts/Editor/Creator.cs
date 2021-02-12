@@ -289,7 +289,7 @@ public static class Creator
         // Destroy redundant ArticulationBodies.
         ArticulationBody[] badBodies = robot.GetComponentsInChildren<ArticulationBody>().
             Where(a => !a.isRoot && a.mass < 0.01f && a.jointType == ArticulationJointType.FixedJoint &&
-            a.GetComponentsInChildren<MeshFilter>().Length == 0).
+            a.GetComponentsInChildren<MeshFilter>().Length == 0 && a.GetComponentsInChildren<MeshCollider>().Length == 0).
             ToArray();
         foreach (ArticulationBody b in badBodies)
         {
@@ -305,8 +305,23 @@ public static class Creator
 
         // Create the prefab.
         PrefabUtility.SaveAsPrefabAsset(robot, "Assets/prefabs/" + robot.name + ".prefab");
+        float minY = 100;
+        foreach (RaycastHit hit in hits)
+        {
+            if (hit.point.y < minY)
+            {
+                minY = hit.point.y;
+            }
+        }
+        robot.gameObject.transform.position = new Vector3(0, -minY, 0);
 
-        Debug.Log("Done!");
+        // Remember the default y value.
+        string yValuesDirectory = Path.Combine(Application.dataPath, "y_values");
+        if (!Directory.Exists(yValuesDirectory))
+        {
+            Directory.CreateDirectory(yValuesDirectory);
+        }
+        File.WriteAllText(Path.Combine(yValuesDirectory, robot.name + ".txt"), robot.name + "," + (-minY));
 
         Object.DestroyImmediate(robot);
     }
