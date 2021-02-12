@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using UnityEngine;
 using UnityEditor;
+using Random = UnityEngine.Random;
 using Object = UnityEngine.Object;
 using RosSharp.Urdf.Editor;
 using RosSharp;
@@ -38,7 +39,7 @@ public static class Creator
     /// Expected command line arguments:
     /// 
     /// -urdf=string_path (Path to the .urdf file. Required.)
-    /// -immovable=true (Whether or not the robot root is immovable. Options: true, false. Default: true)
+    /// -immovable=true (Whether the robot root is immovable. Options: true, false. Default: true)
     /// -up=y (The up axis. Options: y, z. Default: y)
     /// </summary>
     public static void CreatePrefab()
@@ -166,21 +167,32 @@ public static class Creator
 
         // Remove irrelevant ROS components.
         GameObject robot = Object.FindObjectOfType<UrdfRobot>().gameObject;
-        robot.DestroyAll<RosSharp.Urdf.UrdfJoint>();
+        robot.DestroyAll<UrdfJoint>();
         robot.DestroyAll<UrdfInertial>();
         robot.DestroyAll<UrdfVisuals>();
         robot.DestroyAll<UrdfVisual>();
         robot.DestroyAll<UrdfCollisions>();
         robot.DestroyAll<UrdfCollision>();
-        robot.DestroyAll<RosSharp.Urdf.UrdfLink>();
+        robot.DestroyAll<UrdfLink>();
         robot.DestroyAll<UrdfRobot>();
         robot.DestroyAll<Controller>();
-        // Destroy the generated colliders.
-        robot.DestroyAllObjects("Collisions");
         // Destroy unwanted objects.
         robot.DestroyAllComponents<Light>();
         robot.DestroyAllComponents<Camera>();
         robot.DestroyAllComponents<UrdfPlugins>();
+
+        // Save the generated collider meshes.
+        string collidersDirectory = Path.Combine(Application.dataPath, "collider_meshes", robot.name);
+        if (!Directory.Exists(collidersDirectory))
+        {
+            Directory.CreateDirectory(collidersDirectory);
+        }
+        foreach (MeshCollider mc in robot.GetComponentsInChildren<MeshCollider>())
+        {
+            mc.sharedMesh.name = Random.Range(0, 1000000).ToString();
+            AssetDatabase.CreateAsset(mc.sharedMesh, "Assets/collider_meshes/" + robot.name + "/" + mc.sharedMesh.name);
+            AssetDatabase.SaveAssets();
+        }
 
         // Load the .urdf file.
         XmlDocument doc = new XmlDocument();
@@ -290,61 +302,12 @@ public static class Creator
 
         // Destroy redundant ArticulationBodies.
         ArticulationBody[] badBodies = robot.GetComponentsInChildren<ArticulationBody>().
-            Where(a => !a.isRoot && a.mass < 0.01f && a.jointType == ArticulationJointType.FixedJoint && 
+            Where(a => !a.isRoot && a.mass < 0.01f && a.jointType == ArticulationJointType.FixedJoint &&
             a.GetComponentsInChildren<MeshFilter>().Length == 0).
             ToArray();
         foreach (ArticulationBody b in badBodies)
         {
             Object.DestroyImmediate(b.gameObject);
-        }
-
-        XmlNodeList linkNodes = xmlRoot.SelectNodes("link");
-        HashSet<Transform> checkedChildren = new HashSet<Transform>();
-        for (int i = 0; i < linkNodes.Count; i++)
-        {
-            XmlNode meshNode = linkNodes[i].SelectSingleNode("visual/geometry/mesh");
-            if (meshNode == null)
-            {
-                continue;
-            }
-            string meshPath = meshNode.Attributes["filename"].Value;
-            // Get the name of the mesh.
-            string meshName = Path.GetFileNameWithoutExtension(meshPath);
-            // Get the corresponding child object.
-            HashSet<Transform> children = robot.transform.FindDeepChildren(meshName);
-            foreach (Transform child in children)
-            {
-                if (checkedChildren.Contains(child))
-                {
-                    continue;
-                }
-                // Get only the visuals.
-                if (child.parent == null || child.parent.name != "unnamed")
-                {
-                    continue;
-                }
-                meshPath = Regex.Replace(meshPath, "package://", "Assets/robots/");
-                string collidersPath = meshPath.Substring(0, meshPath.Length - 4) + ".obj";
-                // Create the colliders object.
-                GameObject colliders = Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(collidersPath));
-                colliders.name = "colliders_" + child.name;
-                colliders.transform.parent = child;
-                // Match the transform of the colliders to the parent object.
-                colliders.transform.localPosition = Vector3.zero;
-                colliders.transform.localScale = Vector3.one;
-                colliders.transform.localEulerAngles = new Vector3(90, 0, 0);
-                colliders.transform.parent = child.parent.parent.parent;
-                // Create colliders from the mesh filters.
-                foreach (MeshFilter colliderMesh in colliders.GetComponentsInChildren<MeshFilter>())
-                {
-                    MeshCollider mc = colliderMesh.gameObject.AddComponent<MeshCollider>();
-                    mc.sharedMesh = colliderMesh.sharedMesh;
-                    mc.convex = true;
-                    Object.DestroyImmediate(colliderMesh.GetComponent<MeshRenderer>());
-                    Object.DestroyImmediate(colliderMesh);
-                }
-                checkedChildren.Add(child);
-            }
         }
 
         // Create the prefab directory if it doesn't exist.
