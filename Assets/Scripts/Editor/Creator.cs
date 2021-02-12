@@ -20,20 +20,6 @@ using TDW.Robotics;
 /// </summary>
 public static class Creator
 {
-    [MenuItem("Tests/Sawyer")]
-    public static void Sawyer()
-    {
-        string path = Path.Combine(Application.dataPath, "robots/sawyer.urdf");
-        // Create the prefab.
-        ImportSettings settings = new ImportSettings
-        {
-            choosenAxis = ImportSettings.axisType.yAxis,
-            convexMethod = ImportSettings.convexDecomposer.vHACD
-        };
-        CreatePrefab(path, settings, true);
-    }
-
-
     /// <summary>
     /// Create a prefab from a .urdf file. The .urdf file and its meshes must be already downloaded.
     /// Expected command line arguments:
@@ -319,6 +305,10 @@ public static class Creator
 
         // Create the prefab.
         PrefabUtility.SaveAsPrefabAsset(robot, "Assets/prefabs/" + robot.name + ".prefab");
+
+        Debug.Log("Done!");
+
+        Object.DestroyImmediate(robot);
     }
 
 
