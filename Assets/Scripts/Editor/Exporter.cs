@@ -21,6 +21,7 @@ public static class Exporter
             "Assets/Scripts/Util.cs",
             "Assets/Scripts/ExpectedDriveAxis.cs",
             "Assets/Scripts/DriveAxis.cs",
+            "Assets/Scripts/CenterOfMass.cs",
             "Assets/Scripts/Editor/Creator.cs",
             "Assets/Scripts/Editor/RosImporter.cs",
             "Assets/Scenes/SampleScene.unity"
