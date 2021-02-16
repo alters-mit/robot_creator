@@ -305,6 +305,7 @@ public static class Creator
 
         // Create the prefab.
         PrefabUtility.SaveAsPrefabAsset(robot, "Assets/prefabs/" + robot.name + ".prefab");
+        RaycastHit[] hits = Physics.SphereCastAll(new Vector3(0, -1000, 0), 1, Vector3.up);
         float minY = 100;
         foreach (RaycastHit hit in hits)
         {
