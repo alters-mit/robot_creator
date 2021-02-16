@@ -296,6 +296,23 @@ public static class Creator
             Object.DestroyImmediate(b.gameObject);
         }
 
+        // Get the root object.
+        if (robot.GetComponent<ArticulationBody>() == null)
+        {
+            ArticulationBody[] rootBodies = Object.FindObjectsOfType<ArticulationBody>().Where(a => a.isRoot).ToArray();
+            if (rootBodies.Length != 1)
+            {
+                Debug.LogError("Root object of the robot doesn't have an ArticulationBody.");
+            }
+            else
+            {
+                rootBodies[0].gameObject.transform.parent = null;
+                rootBodies[0].gameObject.name = robot.name;
+                Object.DestroyImmediate(robot);
+                robot = rootBodies[0].gameObject;
+            }
+        }
+
         // Create the prefab directory if it doesn't exist.
         string absolutePrefabPath = Path.Combine(Application.dataPath, "prefabs");
         if (!Directory.Exists(absolutePrefabPath))
@@ -305,25 +322,6 @@ public static class Creator
 
         // Create the prefab.
         PrefabUtility.SaveAsPrefabAsset(robot, "Assets/prefabs/" + robot.name + ".prefab");
-        RaycastHit[] hits = Physics.SphereCastAll(new Vector3(0, -1000, 0), 1, Vector3.up);
-        float minY = 100;
-        foreach (RaycastHit hit in hits)
-        {
-            if (hit.point.y < minY)
-            {
-                minY = hit.point.y;
-            }
-        }
-        robot.gameObject.transform.position = new Vector3(0, -minY, 0);
-
-        // Remember the default y value.
-        string yValuesDirectory = Path.Combine(Application.dataPath, "y_values");
-        if (!Directory.Exists(yValuesDirectory))
-        {
-            Directory.CreateDirectory(yValuesDirectory);
-        }
-        File.WriteAllText(Path.Combine(yValuesDirectory, robot.name + ".txt"), robot.name + "," + (-minY));
-
         Object.DestroyImmediate(robot);
     }
 

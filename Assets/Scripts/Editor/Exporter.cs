@@ -22,7 +22,8 @@ public static class Exporter
             "Assets/Scripts/ExpectedDriveAxis.cs",
             "Assets/Scripts/DriveAxis.cs",
             "Assets/Scripts/Editor/Creator.cs",
-            "Assets/Scripts/Editor/RosImporter.cs"
+            "Assets/Scripts/Editor/RosImporter.cs",
+            "Assets/Scenes/SampleScene.unity"
         };
 
         // Get the destination location.
