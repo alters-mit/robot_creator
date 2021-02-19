@@ -44,3 +44,11 @@ The following packages were added:
   com.unity.textmeshpro@3.0.1
   com.unity.timeline@1.4.5
   com.unity.ugui@1.0.0
+
+=== Fri Feb 19 13:25:11 2021
+
+Packages were changed.
+Update Mode: updateDependencies
+
+The following packages were updated:
+  com.unity.test-framework from version 1.1.20 to 1.1.22
