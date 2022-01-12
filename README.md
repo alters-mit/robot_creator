@@ -4,6 +4,10 @@ Create robot asset bundles for [TDW](https://github.com/threedworld-mit/tdw). Se
 
 ## Changelog
 
+### 1.1.1
+
+- Set physics and time global settings to match TDWBase
+
 ### 1.1.0
 
 - Upgraded to Unity 2020.3.24f1
